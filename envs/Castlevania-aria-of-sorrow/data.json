@@ -1,0 +1,12 @@
+{
+  "info": {
+    "Creaking skull health": {
+      "address": 33559696,
+      "type": "<u1"
+    },
+    "Soma health": {
+      "address": 33558632,
+      "type": "<u4"
+    }
+  }
+}
