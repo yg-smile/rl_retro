@@ -172,7 +172,7 @@ def test_model(episodes):
 
             if done:
                 print("Testing episode {} return {} (total steps: {})".format(i_episode, ret, steps))
-        train_writer.add_scalar('Performance/episodic_return', ret, i_episode)
+        train_writer.add_scalar('TestPerformance/episodic_return', ret, i_episode)
 
 
 
