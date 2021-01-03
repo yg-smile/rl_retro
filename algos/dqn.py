@@ -26,6 +26,7 @@ class DQN:
         self.discount = config['discount']  # discount factor
         self.batch_size = config['batch_size']  # mini batch size
         self.frame_skip = config['frame_skip']
+        self.double_q = config['double_q']
 
         self.size_action = config['size_action']
         self.image_h = config['image_h']
@@ -65,7 +66,13 @@ class DQN:
         done = t.done
 
         with torch.no_grad():
-            Q_target = reward + self.discount * (~done) * torch.max(self.Q_tar(next_obs), axis=1, keepdim=True)[0]
+            if self.double_q is True:
+                next_action = torch.max(self.Q(next_obs), axis=1, keepdim=True)[1]
+                next_Q_all = self.Q_tar(next_obs)
+                next_Q = next_Q_all.gather(1, next_action)
+                Q_target = reward + self.discount * (~done) * next_Q
+            else:
+                Q_target = reward + self.discount * (~done) * torch.max(self.Q_tar(next_obs), axis=1, keepdim=True)[0]
 
         Q_all = self.Q(obs)
         Q = Q_all.gather(1, action)
@@ -100,7 +107,7 @@ class DQN:
     def act_deterministic(self, observation: torch.Tensor):
         self.Q.eval()
         Q = self.Q(observation)
-        a = torch.max(Q, axis=1)
+        val, a = torch.max(Q, axis=1)
         self.Q.train()
         return a.item()
 

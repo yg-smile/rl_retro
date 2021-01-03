@@ -1,5 +1,5 @@
-from algos.dqn import DQN
-from algos.buffer import ReplayBuffer
+from algos.bdqn import BDQN
+from algos.buffer import ReplayBufferBootstrap
 
 import numpy as np
 import torch
@@ -11,6 +11,7 @@ import retro
 import os
 import matplotlib.pyplot as plt
 import time
+from torch.distributions.bernoulli import Bernoulli
 
 Tensor = torch.cuda.DoubleTensor
 torch.set_default_tensor_type(Tensor)
@@ -33,6 +34,8 @@ config = {
     'stride': 4,
     'frame_skip': 2,
     'double_q': True,
+    'num_heads': 10,
+    'mask_prob': 0.4,
     'lr': 0.0001,
     'copy_steps': 1000,
     'discount': 0.99,
@@ -61,19 +64,21 @@ action_map = [0, 4, 5, 6, 7, 8, 10, [4, 0]]
 # 11 - unknown
 
 # running simulation
-dqn = DQN(config)
-# Q = torch.load('./model/Q.pth.tar')
+bdqn = BDQN(config)
+# Q = torch.load('./model/bootstrapQ.pth.tar')
 # dqn.Q.load_state_dict(Q['state_dict'])
-# Q_tar = torch.load('./model/Q_tar.pth.tar')
+# Q_tar = torch.load('./model/bootstrapQ_tar.pth.tar')
 # dqn.Q_tar.load_state_dict(Q_tar['state_dict'])
-buffer = ReplayBuffer(config)
-train_writer = SummaryWriter(log_dir='tensorboard/dqn_{env:}_{date:%Y-%m-%d_%H:%M:%S}'.format(
+buffer = ReplayBufferBootstrap(config)
+train_writer = SummaryWriter(log_dir='tensorboard/bdqn_{env:}_{date:%Y-%m-%d_%H:%M:%S}'.format(
                              env=env_name,
                              date=datetime.datetime.now()))
+mask_dist = Bernoulli(torch.tensor([config['mask_prob']]))
+sample_shape = torch.tensor([config['num_heads']])
 
 frame_skip = config['frame_skip']
 obs = env.reset()
-obs_tensor = dqn.phi(obs)
+obs_tensor = bdqn.phi(obs)
 obs_queue = deque([obs_tensor] * frame_skip, maxlen=frame_skip)
 next_obs_queue = deque([obs_tensor] * frame_skip, maxlen=frame_skip)
 
@@ -81,12 +86,13 @@ steps = 0
 steps_before_train = config['steps_before_train']
 for i_episode in range(config['max_episode']):
     obs = env.reset()
+    bdqn.sample_index()
     done = False
     t = 0
     ret = 0.
     while done is False:
         obs_tensor_skip = torch.cat(list(obs_queue)).to('cuda:0')[None, :].double() / 255.0
-        action = dqn.act_probabilistic(obs_tensor_skip)
+        action = bdqn.act_probabilistic(obs_tensor_skip)
         action_onehot = np.zeros(12, dtype='int8')
         action_onehot[action_map[action]] = 1
 
@@ -94,13 +100,13 @@ for i_episode in range(config['max_episode']):
         done_skip = False
         env.render()
         for ii in range(frame_skip):
-            obs_queue.append(dqn.phi(obs))
+            obs_queue.append(bdqn.phi(obs))
             next_obs, reward, done, info = env.step(action_onehot)
             if done is True:
-                obs_queue = deque([dqn.phi(obs)] * frame_skip, maxlen=frame_skip)
-                next_obs_queue = deque([dqn.phi(next_obs)] * frame_skip, maxlen=frame_skip)
+                obs_queue = deque([bdqn.phi(obs)] * frame_skip, maxlen=frame_skip)
+                next_obs_queue = deque([bdqn.phi(next_obs)] * frame_skip, maxlen=frame_skip)
                 break
-            next_obs_queue.append(dqn.phi(next_obs))
+            next_obs_queue.append(bdqn.phi(next_obs))
             reward_skip += reward
             done_skip = done_skip or done
             obs = copy.deepcopy(next_obs)
@@ -110,9 +116,11 @@ for i_episode in range(config['max_episode']):
                                  action=torch.from_numpy(np.array([action])).to(device),
                                  reward=torch.from_numpy(np.array([reward_skip])).to(device),
                                  next_obs=torch.cat(list(next_obs_queue)),
-                                 done=done_skip)
+                                 done=done_skip,
+                                 mask=mask_dist.sample(sample_shape).squeeze()
+                                 )
         if steps > steps_before_train:
-            dqn.update(buffer)
+            bdqn.update(buffer)
 
         t += 1
         steps += 1
@@ -122,24 +130,24 @@ for i_episode in range(config['max_episode']):
             print("Episode {} return {} (total steps: {})".format(i_episode, ret, steps))
     train_writer.add_scalar('Performance/episodic_return', ret, i_episode)
 
-torch.save({'state_dict': dqn.Q.state_dict()}, './model/Q.pth.tar')
-torch.save({'state_dict': dqn.Q_tar.state_dict()}, './model/Q_tar.pth.tar')
+torch.save({'state_dict': bdqn.Q.state_dict()}, './model/bootstrapQ.pth.tar')
+torch.save({'state_dict': bdqn.Q_tar.state_dict()}, './model/bootstrapQ_tar.pth.tar')
 
 env.close()
 train_writer.close()
 
 
 def test_model(episodes):
-    dqn = DQN(config)
-    Q = torch.load('./model/Q.pth.tar')
-    dqn.Q.load_state_dict(Q['state_dict'])
-    Q_tar = torch.load('./model/Q_tar.pth.tar')
-    dqn.Q_tar.load_state_dict(Q_tar['state_dict'])
+    bdqn = BDQN(config)
+    Q = torch.load('./model/bootstrapQ.pth.tar')
+    bdqn.Q.load_state_dict(Q['state_dict'])
+    Q_tar = torch.load('./model/bootstrapQ_tar.pth.tar')
+    bdqn.Q_tar.load_state_dict(Q_tar['state_dict'])
 
     steps = 0
     for i_episode in range(episodes):
         obs = env.reset()
-        obs_tensor = dqn.phi(obs)
+        obs_tensor = bdqn.phi(obs)
         obs_queue = deque([obs_tensor] * frame_skip, maxlen=frame_skip)
         next_obs_queue = deque([obs_tensor] * frame_skip, maxlen=frame_skip)
         done = False
@@ -147,7 +155,7 @@ def test_model(episodes):
         ret = 0.
         while done is False:
             obs_tensor_skip = torch.cat(list(obs_queue)).to('cuda:0')[None, :].double() / 255.0
-            action = dqn.act_deterministic(obs_tensor_skip)
+            action = bdqn.act_deterministic(obs_tensor_skip)
             action_onehot = np.zeros(12, dtype='int8')
             action_onehot[action_map[action]] = 1
 
@@ -156,13 +164,13 @@ def test_model(episodes):
             env.render()
             time.sleep(0.01)
             for ii in range(frame_skip):
-                obs_queue.append(dqn.phi(obs))
+                obs_queue.append(bdqn.phi(obs))
                 next_obs, reward, done, info = env.step(action_onehot)
                 if done is True:
-                    obs_queue = deque([dqn.phi(obs)] * frame_skip, maxlen=frame_skip)
-                    next_obs_queue = deque([dqn.phi(next_obs)] * frame_skip, maxlen=frame_skip)
+                    obs_queue = deque([bdqn.phi(obs)] * frame_skip, maxlen=frame_skip)
+                    next_obs_queue = deque([bdqn.phi(next_obs)] * frame_skip, maxlen=frame_skip)
                     break
-                next_obs_queue.append(dqn.phi(next_obs))
+                next_obs_queue.append(bdqn.phi(next_obs))
                 reward_skip += reward
                 done_skip = done_skip or done
                 obs = copy.deepcopy(next_obs)
