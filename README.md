@@ -25,7 +25,7 @@ epsilon decreasing length: 10000
 ```
 Bootstrapped DDQN as an alternative exploration technique [[3]](#3) hyperparameters (all the same except):
 ```
-number of heads: 100
+number of heads: 10
 mask distribution: Bernoulli(0.4)
 ```
 
