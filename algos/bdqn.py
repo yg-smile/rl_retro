@@ -21,9 +21,6 @@ class BDQN:
 
         self.lr = config['lr']  # learning rate
         self.copy_steps = config['copy_steps']  # copy steps
-        self.exploration_steps = config['exploration_steps']  # length of epsilon greedy exploration
-        self.eps_max = config['eps_max']
-        self.eps_min = config['eps_min']
         self.discount = config['discount']  # discount factor
         self.batch_size = config['batch_size']  # mini batch size
         self.frame_skip = config['frame_skip']

@@ -19,7 +19,7 @@ device = torch.device("cuda:0")
 
 
 # prepare environment
-env_name = 'Castlevania-aria-of-sorrow_3'
+env_name = 'Castlevania-aria-of-sorrow-1stboss_2'
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 retro.data.Integrations.add_custom_path(os.path.join(SCRIPT_DIR, "envs"))
 print(env_name in retro.data.list_games(inttype=retro.data.Integrations.ALL))
@@ -39,9 +39,6 @@ config = {
     'lr': 0.0001,
     'copy_steps': 1000,
     'discount': 0.99,
-    'eps_max': 1.,
-    'eps_min': 0.05,
-    'exploration_steps': 10000,
     'batch_size': 32,
     'replay_buffer_size': 50000,
     'steps_before_train': 1000,

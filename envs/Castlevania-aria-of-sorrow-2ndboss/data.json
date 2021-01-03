@@ -1,0 +1,12 @@
+{
+  "info": {
+    "Manticore health": {
+      "address": 33559828,
+      "type": "<u2"
+    },
+    "Soma health": {
+      "address": 33558632,
+      "type": "<u4"
+    }
+  }
+}
