@@ -4,12 +4,12 @@ Play GBA games using deep reinforcement learning.
 
 ## Castlevania: Aria of Sorrow, first boss
 
-State: 160 * 240 grayscale pixels.
+State: 160 * 240 grayscale pixels. Stacked 2 frames
 Action: Discrete(8) - 1.attack 2.jump 3-6.up down left right 7.back dash 8.(combined) up+attack.
 Reward formulation: negative of boss (Creaking skull) HP loss.
 Done condition: boss defeated or Soma dies.
 
-Using double deep Q learning (DDQN). Hyperparameters:
+Double deep Q learning (DDQN) with epsilon greedy exploration [[1]](#1) [[2]](#2). Hyperparameters:
 ```
 network structure: conv2d -> relu -> conv2d -> relu -> conv2d -> relu -> fully connected
 discount factor: 0.99
@@ -23,11 +23,29 @@ epsilon max: 1.0
 epsilon min: 0.05
 epsilon decreasing length: 10000
 ```
+Bootstrapped DDQN as an alternative exploration technique [[3]](#3) hyperparameters (all the same except):
+```
+number of heads: 10
+mask distribution: Bernoulli(0.4)
+```
 
-After 80 episodes of play:
+
+After 160 episodes of play:
 <p float="left">
-  <img src="https://user-images.githubusercontent.com/49927412/103398702-b8eccd80-4af2-11eb-85a4-bec2dd5ea14d.gif" width="300" />
+  <img src="https://user-images.githubusercontent.com/49927412/103485231-b7006400-4da9-11eb-9ae9-cc933da2103b.gif" width="350" />
+  <img src="https://user-images.githubusercontent.com/49927412/103485485-8d483c80-4dab-11eb-81cf-890d49ce20d0.png" width="350" />
 </p>
+
+References: 
+
+<a id="1">[1]</a> 
+Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., ... & Petersen, S. (2015). Human-level control through deep reinforcement learning. nature, 518(7540), 529-533.
+
+<a id="2">[2]</a> 
+Van Hasselt, H., Guez, A., & Silver, D. (2016, March). Deep reinforcement learning with double q-learning. In Proceedings of the AAAI conference on artificial intelligence (Vol. 30, No. 1).
+
+<a id="3">[3]</a> 
+Osband, I., Blundell, C., Pritzel, A., & Van Roy, B. (2016). Deep exploration via bootstrapped DQN. In Advances in neural information processing systems (pp. 4026-4034).
 
 ## Setup
 Wrap a piece of game as a gym-like environment:
