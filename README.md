@@ -4,10 +4,10 @@ Play GBA games using deep reinforcement learning.
 
 ## Castlevania: Aria of Sorrow, first boss
 
-State: 160 * 240 grayscale pixels. Stacked 2 frames
-Action: Discrete(8) - 1.attack 2.jump 3-6.up down left right 7.back dash 8.(combined) up+attack.
-Reward formulation: negative of boss (Creaking skull) HP loss.
-Done condition: boss defeated or Soma dies.
+State: 160 * 240 grayscale pixels. Stacked 2 frames.  
+Action: Discrete(8) - 1.attack 2.jump 3-6.up down left right 7.back dash 8.(combined) up+attack.  
+Reward formulation: negative of boss (Creaking skull) HP loss.  
+Done condition: boss defeated or Soma dies.  
 
 Double deep Q learning (DDQN) with epsilon greedy exploration [[1]](#1) [[2]](#2). Hyperparameters:
 ```
