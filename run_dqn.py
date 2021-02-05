@@ -17,15 +17,9 @@ torch.set_default_tensor_type(Tensor)
 device = torch.device("cuda:0")
 
 
-# prepare environment
-env_name = 'Castlevania-aria-of-sorrow-1stboss_2'
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-retro.data.Integrations.add_custom_path(os.path.join(SCRIPT_DIR, "envs"))
-print(env_name in retro.data.list_games(inttype=retro.data.Integrations.ALL))
-env = retro.make(env_name, inttype=retro.data.Integrations.ALL)
-
 # simulation setup
 config = {
+    'env_name': 'Castlevania-aria-of-sorrow-2ndboss_2',
     'image_h': 160,
     'image_w': 240,
     'size_action': 8,  # 7 basic button + 1 combined button (up + B)
@@ -44,7 +38,16 @@ config = {
     'steps_before_train': 1000,
     'seed': 1,
     'max_episode': 10000,
+    'load_from_previous': False,
+    'save_current': False,
 }
+
+# prepare environment
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+retro.data.Integrations.add_custom_path(os.path.join(SCRIPT_DIR, "envs"))
+print(config['env_name'] in retro.data.list_games(inttype=retro.data.Integrations.ALL))
+env = retro.make(config['env_name'], inttype=retro.data.Integrations.ALL)
+
 action_map = [0, 4, 5, 6, 7, 8, 10, [4, 0]]
 # action dims:
 # 0 - B (attack)
@@ -62,13 +65,14 @@ action_map = [0, 4, 5, 6, 7, 8, 10, [4, 0]]
 
 # running simulation
 dqn = DQN(config)
-# Q = torch.load('./model/Q.pth.tar')
-# dqn.Q.load_state_dict(Q['state_dict'])
-# Q_tar = torch.load('./model/Q_tar.pth.tar')
-# dqn.Q_tar.load_state_dict(Q_tar['state_dict'])
+if config['load_from_previous'] is True:
+    Q = torch.load('./model/Q.pth.tar')
+    dqn.Q.load_state_dict(Q['state_dict'])
+    Q_tar = torch.load('./model/Q_tar.pth.tar')
+    dqn.Q_tar.load_state_dict(Q_tar['state_dict'])
 buffer = ReplayBuffer(config)
 train_writer = SummaryWriter(log_dir='tensorboard/dqn_{env:}_{date:%Y-%m-%d_%H:%M:%S}'.format(
-                             env=env_name,
+                             env=config['env_name'],
                              date=datetime.datetime.now()))
 
 frame_skip = config['frame_skip']
@@ -122,8 +126,9 @@ for i_episode in range(config['max_episode']):
             print("Episode {} return {} (total steps: {})".format(i_episode, ret, steps))
     train_writer.add_scalar('Performance/episodic_return', ret, i_episode)
 
-torch.save({'state_dict': dqn.Q.state_dict()}, './model/Q.pth.tar')
-torch.save({'state_dict': dqn.Q_tar.state_dict()}, './model/Q_tar.pth.tar')
+if config['save_current'] is True:
+    torch.save({'state_dict': dqn.Q.state_dict()}, './model/Q_{}.pth.tar'.format(config['env_name']))
+    torch.save({'state_dict': dqn.Q_tar.state_dict()}, './model/Q_tar_{}.pth.tar'.format(config['env_name']))
 
 env.close()
 train_writer.close()
@@ -131,9 +136,9 @@ train_writer.close()
 
 def test_model(episodes):
     dqn = DQN(config)
-    Q = torch.load('./model/Q.pth.tar')
+    Q = torch.load('./model/Q_{}.pth.tar'.format(config['env_name']))
     dqn.Q.load_state_dict(Q['state_dict'])
-    Q_tar = torch.load('./model/Q_tar.pth.tar')
+    Q_tar = torch.load('./model/Q_tar_{}.pth.tar'.format(config['env_name']))
     dqn.Q_tar.load_state_dict(Q_tar['state_dict'])
 
     steps = 0

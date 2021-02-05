@@ -1,0 +1,25 @@
+{
+  "crop": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "done": {
+    "variables": {
+      "Manticore health": {
+        "op": "equal"
+      },
+      "Soma health": {
+        "op": "equal"
+      }
+    }
+  },
+  "reward": {
+    "variables": {
+      "Manticore health": {
+        "penalty": -1.0
+      }
+    }
+  }
+}

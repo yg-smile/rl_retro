@@ -7,8 +7,9 @@ from math import sqrt
 
 from numpy.random import uniform
 from numpy.random import choice
-from skimage.transform import resize
-from skimage.color import rgb2gray
+
+from algos.models import EnsembleCNNQNetwork
+from algos.algos_utils import phi
 
 Tensor = torch.cuda.DoubleTensor
 torch.set_default_tensor_type(Tensor)
@@ -33,18 +34,19 @@ class BDQN:
         self.kernel_size = config['kernel_size']
         self.stride = config['stride']
 
-        self.Q = QNetwork(h=self.image_h,
-                          w=self.image_w,
-                          channels=self.frame_skip,
-                          size_action=self.size_action,
-                          kernel_size=self.kernel_size,
-                          stride=self.stride)
-        self.Q_tar = QNetwork(h=self.image_h,
-                              w=self.image_w,
-                              channels=self.frame_skip,
-                              size_action=self.size_action,
-                              kernel_size=self.kernel_size,
-                              stride=self.stride)
+        self.phi = phi
+        self.Q = EnsembleCNNQNetwork(h=self.image_h,
+                             w=self.image_w,
+                             channels=self.frame_skip,
+                             size_action=self.size_action,
+                             kernel_size=self.kernel_size,
+                             stride=self.stride)
+        self.Q_tar = EnsembleCNNQNetwork(h=self.image_h,
+                                 w=self.image_w,
+                                 channels=self.frame_skip,
+                                 size_action=self.size_action,
+                                 kernel_size=self.kernel_size,
+                                 stride=self.stride)
 
         self.optimizer_Q = torch.optim.RMSprop(self.Q.parameters(), lr=self.lr)
         self.training_step = 0
@@ -53,12 +55,6 @@ class BDQN:
 
     def sample_index(self):
         self.h = np.random.choice(self.num_heads)
-
-    def phi(self, img):
-        # input: img: uint8 numpy array with 3 color channels with shape (h, w, 3)
-        # output: tensor with 1 channel with shape (1, h, w)
-        grayscale = np.uint8(255 * rgb2gray(img))
-        return torch.from_numpy(grayscale)[None, :, :]
 
     def update(self, buffer):
         t = buffer.sample(self.batch_size)
@@ -109,36 +105,3 @@ class BDQN:
         val, a = torch.max(torch.mean(Q, axis=1), axis=1)
         self.Q.train()
         return a.item()
-
-
-class QNetwork(nn.Module):
-    def __init__(self,
-                 h,
-                 w,
-                 size_action,
-                 channels,
-                 kernel_size=5,
-                 stride=2,
-                 num_heads=10,
-                 ):
-        super(QNetwork, self).__init__()
-
-        self.conv1 = nn.Conv2d(in_channels=channels, out_channels=16, kernel_size=kernel_size, stride=stride)
-        # self.bn1 = nn.BatchNorm2d(16)
-        # self.maxpool1 = nn.MaxPool2d(kernel_size=2)
-        self.conv2 = nn.Conv2d(in_channels=16, out_channels=16, kernel_size=kernel_size, stride=stride)
-        # self.bn2 = nn.BatchNorm2d(16)
-        # self.maxpool2 = nn.MaxPool2d(kernel_size=2)
-        self.conv3 = nn.Conv2d(in_channels=16, out_channels=16, kernel_size=kernel_size, stride=stride)
-        # self.bn3 = nn.BatchNorm2d(16)
-        self.out_w = nn.Parameter(torch.randn(num_heads, 96, size_action) * sqrt(2 / (96 + size_action)),
-                                  requires_grad=True)
-        self.out_b = nn.Parameter(torch.zeros(1, num_heads, size_action), requires_grad=True)
-
-    def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = torch.relu(self.conv2(x))
-        x = torch.relu(self.conv3(x))
-        x = x.view(x.size(0), -1)
-        output = torch.einsum('bi,nio->bno', x, self.out_w) + self.out_b
-        return output
